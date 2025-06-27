@@ -1,46 +1,34 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-from tensorflow.keras.models import load_model
 import joblib
+from tensorflow.keras.models import load_model
 
-# --- Title ---
-st.title("🌡️ Temperature Predictor")
-st.markdown("Predict the next day's temperature using an RNN model.")
+# Load model and scaler
+model = load_model("temperature_rnn_model.keras")
+scaler = joblib.load("scaler.save")
 
-# --- Load the model and scaler ---
-@st.cache_resource
-def load_model_and_scaler():
-    model = load_model("temperature_rnn_model.keras")  # New Keras format
-    scaler = joblib.load("temperature_scaler.save")
-    return model, scaler
+# Input section
+st.title("Next Day Temperature Prediction")
+st.write("Enter the last 30 days' temperatures (one per line):")
 
-model, scaler = load_model_and_scaler()
+temps_input = st.text_area("Temperatures (°C)", placeholder="12.3\n13.5\n14.8\n...")
 
-# --- Load the dataset ---
-@st.cache_data
-def load_data():
-    df = pd.read_csv("daily_minimum_temps.csv", parse_dates=["Date"], index_col="Date")
-    df["Temp"] = pd.to_numeric(df["Temp"], errors="coerce")
-    df.dropna(inplace=True)
-    return df
+if st.button("Predict Next Day Temperature"):
+    try:
+        # Parse input
+        temps = [float(t) for t in temps_input.strip().split()]
+        if len(temps) != 30:
+            st.error("Please enter exactly 30 temperature values.")
+        else:
+            # Scale and reshape
+            temps_scaled = scaler.transform(np.array(temps).reshape(-1, 1))
+            input_seq = temps_scaled.reshape(1, 30, 1)
 
-df = load_data()
+            # Predict and inverse transform
+            pred_scaled = model.predict(input_seq)
+            pred_temp = scaler.inverse_transform(pred_scaled)
 
-# --- Show recent temperature data ---
-st.subheader("📈 Recent Temperature Data")
-st.line_chart(df["Temp"].tail(100))
-
-# --- Normalize and prepare last sequence ---
-SEQ_LENGTH = 30
-data_scaled = scaler.transform(df["Temp"].values.reshape(-1, 1))
-last_sequence = data_scaled[-SEQ_LENGTH:].reshape(1, SEQ_LENGTH, 1)
-
-# --- Predict next temperature ---
-pred_scaled = model.predict(last_sequence)
-pred_scaled = np.clip(pred_scaled, 0, 1)
-next_temp = scaler.inverse_transform(pred_scaled)
-
-# --- Show prediction ---
-st.subheader("🔮 Predicted Temperature for Next Day:")
-st.success(f"{next_temp[0][0]:.2f} °C")
+            st.success(f"Predicted Next Day Temperature: {pred_temp[0][0]:.2f} °C")
+    except Exception as e:
+        st.error(f"Error: {e}")
