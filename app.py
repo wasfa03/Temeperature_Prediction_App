@@ -6,7 +6,7 @@ from tensorflow.keras.models import load_model
 
 # Load model and scaler
 model = load_model("temperature_rnn_model.keras")
-scaler = joblib.load("scaler.save")
+scaler = joblib.load("temperature_scaler.save")
 
 # Input section
 st.title("Next Day Temperature Prediction")
