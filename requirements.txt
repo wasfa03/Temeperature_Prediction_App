@@ -1,7 +1,7 @@
+streamlit
 numpy
 pandas
 tensorflow
 scikit-learn
-streamlit
 joblib
 matplotlib
