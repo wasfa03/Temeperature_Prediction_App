@@ -28,6 +28,20 @@ def load_saved_components():
 
 model, scaler = load_saved_components()
 
+# Load the dataset
+@st.cache_data
+def load_dataset():
+    try:
+        df = pd.read_csv("daily_minimum_temps.csv", parse_dates=["Date"], index_col="Date")
+        df["Temp"] = pd.to_numeric(df["Temp"], errors="coerce")
+        df = df.dropna()
+        return df
+    except Exception as e:
+        st.error(f"Error loading dataset: {str(e)}")
+        return None
+
+df = load_dataset()
+
 # Sidebar for user inputs
 with st.sidebar:
     st.header("Prediction Settings")
@@ -38,23 +52,12 @@ with st.sidebar:
         st.warning("No model loaded. Please check if model files exist.")
     else:
         st.success("Model and scaler loaded successfully!")
+    
+    if df is not None:
+        st.info(f"Dataset loaded with {len(df)} records")
 
-# File uploader for new data
-uploaded_file = st.file_uploader("Upload new temperature data (CSV)", type=["csv"])
-
-if uploaded_file is not None and model is not None and scaler is not None:
+if df is not None and model is not None and scaler is not None:
     try:
-        # Load and preprocess data
-        df = pd.read_csv(uploaded_file, parse_dates=["Date"], index_col="Date")
-        
-        # Show raw data
-        with st.expander("Show Raw Data"):
-            st.dataframe(df.head())
-        
-        # Data preprocessing
-        df["Temp"] = pd.to_numeric(df["Temp"], errors="coerce")
-        df = df.dropna()
-        
         # Normalize the data using the loaded scaler
         data_scaled = scaler.transform(df["Temp"].values.reshape(-1, 1))
         
@@ -99,6 +102,16 @@ if uploaded_file is not None and model is not None and scaler is not None:
             # Show recent temperatures
             st.subheader("Recent Temperatures")
             st.dataframe(df.tail(10))
+            
+            # Show dataset statistics
+            with st.expander("Dataset Statistics"):
+                st.write(df.describe())
+                fig_dist = plt.figure(figsize=(8, 4))
+                plt.hist(df["Temp"], bins=30)
+                plt.title("Temperature Distribution")
+                plt.xlabel("Temperature (°C)")
+                plt.ylabel("Frequency")
+                st.pyplot(fig_dist)
         
         with col2:
             st.subheader("Actual vs Predicted Values")
@@ -111,38 +124,29 @@ if uploaded_file is not None and model is not None and scaler is not None:
             plt.legend()
             st.pyplot(fig_pred)
         
-        # Show prediction statistics
-        with st.expander("Prediction Statistics"):
-            errors = y_actual.flatten() - y_pred.flatten()
-            mae = np.mean(np.abs(errors))
-            rmse = np.sqrt(np.mean(errors**2))
-            
-            st.metric("Mean Absolute Error", f"{mae:.2f}°C")
-            st.metric("Root Mean Square Error", f"{rmse:.2f}°C")
-            
-            fig_error = plt.figure(figsize=(8, 4))
-            plt.hist(errors, bins=30)
-            plt.title("Prediction Error Distribution")
-            plt.xlabel("Error (°C)")
-            plt.ylabel("Frequency")
-            st.pyplot(fig_error)
+            # Show prediction statistics
+            with st.expander("Prediction Performance"):
+                errors = y_actual.flatten() - y_pred.flatten()
+                mae = np.mean(np.abs(errors))
+                rmse = np.sqrt(np.mean(errors**2))
+                
+                st.metric("Mean Absolute Error", f"{mae:.2f}°C")
+                st.metric("Root Mean Square Error", f"{rmse:.2f}°C")
+                
+                fig_error = plt.figure(figsize=(8, 4))
+                plt.hist(errors, bins=30)
+                plt.title("Prediction Error Distribution")
+                plt.xlabel("Error (°C)")
+                plt.ylabel("Frequency")
+                st.pyplot(fig_error)
     
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
 elif model is None or scaler is None:
-    st.info("Please ensure both model and scaler files are available in the directory.")
+    st.error("Required model files not found. Please ensure these files are present:")
     st.markdown("""
-    ### Required Files
     - `temperature_rnn_model.h5` - The saved Keras model
     - `temperature_scaler.save` - The saved scaler object
-    
-    ### Sample Data Format
-    Your CSV file should have the following format:
-    ```
-    Date,Temp
-    1981-01-01,20.7
-    1981-01-02,17.9
-    1981-01-03,18.8
-    ...
-    ```
     """)
+elif df is None:
+    st.error("Could not load the dataset. Please ensure 'daily_minimum_temps.csv' exists in the directory.")
