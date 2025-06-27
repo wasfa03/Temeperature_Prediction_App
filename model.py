@@ -97,7 +97,8 @@ next_day_temp=scaler.inverse_transform(next_temp_scaled)
 print("the next day's temperature is:",next_day_temp)
 
 # Save the trained model
-model.save("temperature_rnn_model.h5")  # saves the model architecture, weights, and optimizer state
+# Save using the new Keras format
+model.save("temperature_rnn_model.keras")  # saves the model architecture, weights, and optimizer state
 
 # Save the scaler using joblib
 import joblib
